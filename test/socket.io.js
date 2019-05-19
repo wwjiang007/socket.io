@@ -1,3 +1,5 @@
+'use strict';
+
 var http = require('http').Server;
 var io = require('../lib');
 var fs = require('fs');
@@ -351,6 +353,17 @@ describe('socket.io', function(){
        .query({ transport: 'polling' })
        .end(function (err, res) {
           expect(res.status).to.be(403);
+          done();
+        });
+    });
+
+    it('should allow request when using an array of origins', function(done) {
+      io({ origins: [ 'http://foo.example:54024' ] }).listen('54024');
+      request.get('http://localhost:54024/socket.io/default/')
+        .set('origin', 'http://foo.example:54024')
+        .query({ transport: 'polling' })
+        .end(function (err, res) {
+          expect(res.status).to.be(200);
           done();
         });
     });
@@ -875,6 +888,61 @@ describe('socket.io', function(){
             done();
           });
           sio.of('/chat').compress(false).emit('woot', 'hi');
+        });
+      });
+    });
+
+    describe('dynamic namespaces', function () {
+      it('should allow connections to dynamic namespaces with a regex', function(done){
+        const srv = http();
+        const sio = io(srv);
+        let count = 0;
+        srv.listen(function(){
+          const socket = client(srv, '/dynamic-101');
+          let dynamicNsp = sio.of(/^\/dynamic-\d+$/).on('connect', (socket) => {
+            expect(socket.nsp.name).to.be('/dynamic-101');
+            dynamicNsp.emit('hello', 1, '2', { 3: '4'});
+            if (++count === 4) done();
+          }).use((socket, next) => {
+            next();
+            if (++count === 4) done();
+          });
+          socket.on('error', function(err) {
+            expect().fail();
+          });
+          socket.on('connect', () => {
+            if (++count === 4) done();
+          });
+          socket.on('hello', (a, b, c) => {
+            expect(a).to.eql(1);
+            expect(b).to.eql('2');
+            expect(c).to.eql({ 3: '4' });
+            if (++count === 4) done();
+          });
+        });
+      });
+
+      it('should allow connections to dynamic namespaces with a function', function(done){
+        const srv = http();
+        const sio = io(srv);
+        srv.listen(function(){
+          const socket = client(srv, '/dynamic-101');
+          sio.of((name, query, next) => next(null, '/dynamic-101' === name));
+          socket.on('connect', done);
+        });
+      });
+
+      it('should disallow connections when no dynamic namespace matches', function(done){
+        const srv = http();
+        const sio = io(srv);
+        srv.listen(function(){
+          const socket = client(srv, '/abc');
+          sio.of(/^\/dynamic-\d+$/);
+          sio.of((name, query, next) => next(null, '/dynamic-101' === name));
+          socket.on('error', (err) => {
+            expect(err).to.be('Invalid namespace');
+            done();
+          });
         });
       });
     });
@@ -1673,7 +1741,7 @@ describe('socket.io', function(){
         var socket = client(srv, { reconnection: false });
         sio.on('connection', function(s){
           s.conn.on('upgrade', function(){
-            console.log('\033[96mNote: warning expected and normal in test.\033[39m');
+            console.log('\u001b[96mNote: warning expected and normal in test.\u001b[39m');
             socket.io.engine.write('5woooot');
             setTimeout(function(){
               done();
@@ -1690,7 +1758,7 @@ describe('socket.io', function(){
         var socket = client(srv, { reconnection: false });
         sio.on('connection', function(s){
           s.conn.on('upgrade', function(){
-            console.log('\033[96mNote: warning expected and normal in test.\033[39m');
+            console.log('\u001b[96mNote: warning expected and normal in test.\u001b[39m');
             socket.io.engine.write('44["handle me please"]');
             setTimeout(function(){
               done();
@@ -2275,6 +2343,23 @@ describe('socket.io', function(){
       var socket = client(srv);
       socket.on('connect', function(){
         done();
+      });
+    });
+
+    it('should work with a custom namespace', (done) => {
+      var srv = http();
+      var sio = io();
+      sio.listen(srv);
+      sio.of('/chat').use(function(socket, next){
+        next();
+      });
+
+      var count = 0;
+      client(srv, '/').on('connect', () => {
+        if (++count === 2) done();
+      });
+      client(srv, '/chat').on('connect', () => {
+        if (++count === 2) done();
       });
     });
   });

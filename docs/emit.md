@@ -29,7 +29,7 @@ function onConnect(socket){
   io.of('myNamespace').to('room').emit('event', 'message');
 
   // sending to individual socketid (private message)
-  socket.to(<socketid>).emit('hey', 'I just met you');
+  io.to(<socketid>).emit('hey', 'I just met you');
 
   // sending with acknowledgement
   socket.emit('question', 'do you think so?', function (answer) {});
@@ -40,9 +40,12 @@ function onConnect(socket){
   // sending a message that might be dropped if the client is not ready to receive messages
   socket.volatile.emit('maybe', 'do you really need it?');
 
+  // specifying whether the data to send has binary data
+  socket.binary(false).emit('what', 'I have no binaries!');
+
   // sending to all clients on this node (when using multiple nodes)
   io.local.emit('hi', 'my lovely babies');
-  
+
   // sending to all connected clients
   io.emit('an event sent to all connected clients');
 

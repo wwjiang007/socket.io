@@ -33,6 +33,7 @@
     - [Event: 'connection'](#event-connect)
     - [Flag: 'volatile'](#flag-volatile)
     - [Flag: 'local'](#flag-local)
+    - [Flag: 'binary'](#flag-binary)
   - [Class: Socket](#socket)
     - [socket.id](#socketid)
     - [socket.rooms](#socketrooms)
@@ -57,6 +58,7 @@
     - [socket.disconnect(close)](#socketdisconnectclose)
     - [Flag: 'broadcast'](#flag-broadcast)
     - [Flag: 'volatile'](#flag-volatile-1)
+    - [Flag: 'binary'](#flag-binary-1)
     - [Event: 'disconnect'](#event-disconnect)
     - [Event: 'error'](#event-error)
     - [Event: 'disconnecting'](#event-disconnecting)
@@ -222,13 +224,13 @@ io.adapter(redis({ host: 'localhost', port: 6379 }));
 
 #### server.origins([value])
 
-  - `value` _(String)_
+  - `value` _(String|String[])_
   - **Returns** `Server|String`
 
 Sets the allowed origins `value`. Defaults to any origins being allowed. If no arguments are supplied this method returns the current value.
 
 ```js
-io.origins(['foo.example.com:443']);
+io.origins(['https://foo.example.com:443']);
 ```
 
 #### server.origins(fn)
@@ -236,7 +238,7 @@ io.origins(['foo.example.com:443']);
   - `fn` _(Function)_
   - **Returns** `Server`
 
-Provides a function taking two arguments `origin:String` and `callback(error, success)`, where `success` is a boolean value indicating whether origin is allowed or not.
+Provides a function taking two arguments `origin:String` and `callback(error, success)`, where `success` is a boolean value indicating whether origin is allowed or not.  If `success` is set to `false`, `error` must be provided as a string value that will be appended to the server response, e.g. "Origin not allowed".
 
 __Potential drawbacks__:
 * in some situations, when it is not possible to determine `origin` it may have value of `*`
@@ -290,13 +292,41 @@ Advanced use only. Creates a new `socket.io` client from the incoming engine.io 
 
 #### server.of(nsp)
 
-  - `nsp` _(String)_
+  - `nsp` _(String|RegExp|Function)_
   - **Returns** `Namespace`
 
 Initializes and retrieves the given `Namespace` by its pathname identifier `nsp`. If the namespace was already initialized it returns it immediately.
 
 ```js
 const adminNamespace = io.of('/admin');
+```
+
+A regex or a function can also be provided, in order to create namespace in a dynamic way:
+
+```js
+const dynamicNsp = io.of(/^\/dynamic-\d+$/).on('connect', (socket) => {
+  const newNamespace = socket.nsp; // newNamespace.name === '/dynamic-101'
+
+  // broadcast to all clients in the given sub-namespace
+  newNamespace.emit('hello');
+});
+
+// client-side
+const socket = io('/dynamic-101');
+
+// broadcast to all clients in each sub-namespace
+dynamicNsp.emit('hello');
+
+// use a middleware for each sub-namespace
+dynamicNsp.use((socket, next) => { /* ... */ });
+```
+
+With a function:
+
+```js
+io.of((name, query, next) => {
+  next(null, checkToken(query.token));
+}).on('connect', (socket) => { /* ... */ });
 ```
 
 #### server.close([callback])
@@ -468,6 +498,14 @@ Sets a modifier for a subsequent event emission that the event data may be lost 
 
 ```js
 io.volatile.emit('an event', { some: 'data' }); // the clients may or may not receive it
+```
+
+#### Flag: 'binary'
+
+Specifies whether there is binary data in the emitted data. Increases performance when specified. Can be `true` or `false`.
+
+```js
+io.binary(false).emit('an event', { some: 'data' });
 ```
 
 #### Flag: 'local'
@@ -766,6 +804,17 @@ Sets a modifier for a subsequent event emission that the event data may be lost 
 ```js
 io.on('connection', (socket) => {
   socket.volatile.emit('an event', { some: 'data' }); // the client may or may not receive it
+});
+```
+
+#### Flag: 'binary'
+
+Specifies whether there is binary data in the emitted data. Increases performance when specified. Can be `true` or `false`.
+
+```js
+var io = require('socket.io')();
+io.on('connection', function(socket){
+  socket.binary(false).emit('an event', { some: 'data' }); // The data to send has no binary data
 });
 ```
 
