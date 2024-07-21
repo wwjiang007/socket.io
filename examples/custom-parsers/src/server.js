@@ -14,20 +14,27 @@ const msgpackParser = require('socket.io-msgpack-parser');
 const jsonParser = require('socket.io-json-parser');
 const customParser = require('./custom-parser');
 
-let server1 = io(3001, {});
+const cors = {
+  origin: ["http://localhost:3000"]
+}
+
+let server1 = io(3001, { cors });
 let server2 = io(3002, {
-  parser: msgpackParser
+  parser: msgpackParser,
+  cors
 });
 let server3 = io(3003, {
-  parser: jsonParser
+  parser: jsonParser,
+  cors
 });
 let server4 = io(3004, {
-  parser: customParser
+  parser: customParser,
+  cors
 });
 
 let string = [];
 let numeric = [];
-let binary = new Buffer(1e3);
+let binary = Buffer.allocUnsafe(1e3);
 for (var i = 0; i < 1e3; i++) {
   string.push('' + i);
   numeric.push(i);
